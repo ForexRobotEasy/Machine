@@ -1,0 +1,89 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                            Machine.mq5           |
+//|                           Copyright 2021, Forex Robot Easy Team  |
+//|                               https://www.forexroboteasy.com     |
+//+------------------------------------------------------------------+
+
+// Define input parameters
+input double StopLoss = 50;              // Stop loss level in pips
+input double TakeProfit = 100;           // Take profit level in pips
+input double LotSize = 0.01;             // Lot size for each position
+input double BasketDistance = 20;        // Distance between entry levels in pips
+
+// Define global variables
+int OrderTicket1, OrderTicket2, OrderTicket3;   // Order ticket numbers
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+    // Set initial values
+    OrderTicket1 = -1;
+    OrderTicket2 = -1;
+    OrderTicket3 = -1;
+
+    return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Expert start function                                            |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+    // Check if all orders have been closed
+    if (OrderTicket1 == -1 && OrderTicket2 == -1 && OrderTicket3 == -1)
+    {
+        // Get Bollinger Bands values
+        double upperBand = iBands(_Symbol, _Period, 20, 2, 0, PRICE_CLOSE, MODE_UPPER, 1);
+        double lowerBand = iBands(_Symbol, _Period, 20, 2, 0, PRICE_CLOSE, MODE_LOWER, 1);
+
+        // Check if price is close to upper band
+        if (Close[1] > upperBand - BasketDistance * _Point)
+        {
+            // Open first basket of positions
+            OrderTicket1 = OrderSend(_Symbol, OP_BUY, LotSize, Ask, 0, Ask - StopLoss * _Point, Ask + TakeProfit * _Point, 'Basket1', 0, 0, clrGreen);
+            OrderTicket2 = OrderSend(_Symbol, OP_BUY, LotSize, Ask, 0, Ask - StopLoss * _Point, Ask + TakeProfit * _Point, 'Basket2', 0, 0, clrGreen);
+            OrderTicket3 = OrderSend(_Symbol, OP_BUY, LotSize, Ask, 0, Ask - StopLoss * _Point, Ask + TakeProfit * _Point, 'Basket3', 0, 0, clrGreen);
+        }
+        // Check if price is close to lower band
+        else if (Close[1] < lowerBand + BasketDistance * _Point)
+        {
+            // Open second basket of positions
+            OrderTicket1 = OrderSend(_Symbol, OP_SELL, LotSize, Bid, 0, Bid + StopLoss * _Point, Bid - TakeProfit * _Point, 'Basket1', 0, 0, clrRed);
+            OrderTicket2 = OrderSend(_Symbol, OP_SELL, LotSize, Bid, 0, Bid + StopLoss * _Point, Bid - TakeProfit * _Point, 'Basket2', 0, 0, clrRed);
+            OrderTicket3 = OrderSend(_Symbol, OP_SELL, LotSize, Bid, 0, Bid + StopLoss * _Point, Bid - TakeProfit * _Point, 'Basket3', 0, 0, clrRed);
+        }
+    }
+    else
+    {
+        // Check if any order has reached take profit level
+        if (OrderSelect(OrderTicket1, SELECT_BY_TICKET))
+        {
+            if (OrderProfit() >= TakeProfit * _Point)
+            {
+                OrderClose(OrderTicket1, OrderLots(), Bid, 0, clrGreen);
+                OrderClose(OrderTicket2, OrderLots(), Bid, 0, clrGreen);
+                OrderClose(OrderTicket3, OrderLots(), Bid, 0, clrGreen);
+                OrderTicket1 = -1;
+                OrderTicket2 = -1;
+                OrderTicket3 = -1;
+            }
+        }
+
+        // Check if any order has reached stop loss level
+        if (OrderSelect(OrderTicket1, SELECT_BY_TICKET))
+        {
+            if (OrderProfit() <= -StopLoss * _Point)
+            {
+                OrderClose(OrderTicket1, OrderLots(), Bid, 0, clrRed);
+                OrderClose(OrderTicket2, OrderLots(), Bid, 0, clrRed);
+                OrderClose(OrderTicket3, OrderLots(), Bid, 0, clrRed);
+                OrderTicket1 = -1;
+                OrderTicket2 = -1;
+                OrderTicket3 = -1;
+            }
+        }
+    }
+}
